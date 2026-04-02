@@ -31,3 +31,6 @@ build/
 
 ### VS Code ###
 .vscode/
+
+## Volume Data ##
+volume-data/mysql_keycloak_data/
