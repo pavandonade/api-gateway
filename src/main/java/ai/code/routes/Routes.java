@@ -1,18 +1,25 @@
 package ai.code.routes;
 
+import org.springframework.cloud.gateway.server.mvc.filter.CircuitBreakerFilterFunctions;
 import org.springframework.cloud.gateway.server.mvc.handler.GatewayRouterFunctions;
 import org.springframework.cloud.gateway.server.mvc.handler.HandlerFunctions;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.servlet.function.RequestPredicates;
 import org.springframework.web.servlet.function.RouterFunction;
 import org.springframework.web.servlet.function.ServerResponse;
+
+import java.net.URI;
+
 import static org.springframework.cloud.gateway.server.mvc.filter.BeforeFilterFunctions.*;
+import static org.springframework.cloud.gateway.server.mvc.handler.GatewayRouterFunctions.route;
 
 @Configuration
 public class Routes {
 
     private static final String API_ROUTE = "/${segment}";
+    private static final String FALLBACK_ROUTE = "forward:/fallbackRoute";
 
     @Bean
     public RouterFunction<ServerResponse> productServiceRoute(){
@@ -20,6 +27,8 @@ public class Routes {
                 .route(RequestPredicates.path("/api/product"),
                         HandlerFunctions.http())
                 .before(uri("http://localhost:8080"))
+                .filter(CircuitBreakerFilterFunctions.circuitBreaker("productServiceCircuitBreaker",
+                        URI.create(FALLBACK_ROUTE)))
                 .build();
     }
 
@@ -29,6 +38,8 @@ public class Routes {
                 .route(RequestPredicates.path("/aggregate/product-service/api-docs"),
                         HandlerFunctions.http())
                 .before(uri("http://localhost:8080"))
+                .filter(CircuitBreakerFilterFunctions.circuitBreaker("productServiceSwaggerCircuitBreaker",
+                        URI.create(FALLBACK_ROUTE)))
                 .before(rewritePath("/aggregate/product-service/(?<segment>.*)", API_ROUTE))
                 .build();
     }
@@ -39,6 +50,8 @@ public class Routes {
                 .route(RequestPredicates.path("/api/order"),
                         HandlerFunctions.http())
                 .before(uri("http://localhost:8081"))
+                .filter(CircuitBreakerFilterFunctions.circuitBreaker("orderServiceCircuitBreaker",
+                        URI.create(FALLBACK_ROUTE)))
                 .build();
     }
 
@@ -48,6 +61,8 @@ public class Routes {
                 .route(RequestPredicates.path("/aggregate/order-service/api-docs"),
                         HandlerFunctions.http())
                 .before(uri("http://localhost:8081"))
+                .filter(CircuitBreakerFilterFunctions.circuitBreaker("orderServiceSwaggerCircuitBreaker",
+                        URI.create(FALLBACK_ROUTE)))
                 .before(rewritePath("/aggregate/order-service/(?<segment>.*)", API_ROUTE))
                 .build();
     }
@@ -58,6 +73,8 @@ public class Routes {
                 .route(RequestPredicates.path("/api/inventory"),
                         HandlerFunctions.http())
                 .before(uri("http://localhost:8082"))
+                .filter(CircuitBreakerFilterFunctions.circuitBreaker("inventoryServiceCircuitBreaker",
+                        URI.create(FALLBACK_ROUTE)))
                 .build();
     }
 
@@ -67,7 +84,18 @@ public class Routes {
                 .route(RequestPredicates.path("/aggregate/inventory-service/api-docs"),
                         HandlerFunctions.http())
                 .before(uri("http://localhost:8082"))
+                .filter(CircuitBreakerFilterFunctions.circuitBreaker("inventoryServiceSwaggerCircuitBreaker",
+                        URI.create(FALLBACK_ROUTE)))
                 .before(rewritePath("/aggregate/inventory-service/(?<segment>.*)", API_ROUTE))
                 .build();
     }
+
+    @Bean
+    public RouterFunction<ServerResponse> fallbackRoute(){
+        return route("fallbackRoute")
+                .GET("/fallbackRoute", request -> ServerResponse.status(HttpStatus.SERVICE_UNAVAILABLE)
+                        .body("Service is currently unavailable. Please try again later."))
+                .build();
+    }
+
 }
